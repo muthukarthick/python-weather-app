@@ -1,0 +1,248 @@
+*************************************************************
+ Various Useful Painless Queries for use in Kibana Dev Tools
+*************************************************************
+
+-------------------------------------------------------------------------------
+
+DELETE WHOLE INDEX (TO START FROM SCRATCH)
+
+DELETE /weather_index
+
+-------------------------------------------------------------------------------
+
+GET ALL DOCUMENTS THAT MATCH A QUERY 
+example: all documents with "wmo" = 99435 (all documents from Wellcamp Airport)
+
+GET weather_index/_search
+{
+  "from" : 0, "size" : 100,
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "wmo":   "99435"        }}
+      ]
+    }
+  }
+}
+
+-------------------------------------------------------------------------------
+
+QUERY TO GET THE MAPPING FOR A SINGLE FIELD
+example: mapping for field "aifstime_utc"
+
+GET /weather_index/_mapping/field/aifstime_utc
+
+-------------------------------------------------------------------------------
+
+CREATE NEW DOCUMENT WITH SAVED DATA
+example: called "imasampledocument" with the following saved data
+- does not have to have all fields filled at the time of insertion 
+	(other fields can be filled later)
+
+POST /weather_index/_doc/imasampledocument
+{"wmo": 99435, "name": "Wellcamp Airport", "wind_spd_kmh": 20, 
+	"wind_spd_kt": 11, "local_image_b64": "null"}
+
+-------------------------------------------------------------------------------
+
+CREATE NEW MAPPING FIELD (EMPTY)
+
+EXAMPLE 1: create new field called "useful_date" that contains a date value
+
+PUT /weather_index/_mapping
+{
+  "properties": {
+    "useful_date": {
+      "type": "date"
+    }
+  }
+}
+
+EXAMPLE 2: create new field called "wind_angle" that contains a float value
+
+PUT /weather_index/_mapping
+{
+  "properties": {
+    "wind_angle": {
+      "type": "float"
+    }
+  }
+}
+
+-------------------------------------------------------------------------------
+
+CREATE DATA IN NEW FIELD
+
+EXAMPLE 1: fill "useful_date" field (type = date) with data from epoch_date 
+	field (type = string) - use to provide Kibana with a working date value to 
+	analyze and visualize data. (linked to example 1 in create new field above)
+
+POST weather_index/_update_by_query
+{
+  "script": {
+	"lang": "painless",
+    "source": """
+      if(ctx._source.useful_date == null) {
+        ctx._source.useful_date = ctx._source.epoch_date;
+      }
+    """
+  }
+}
+
+EXAMPLE 2: fill "wind_angle" field (type = float) with data.  This script below
+	inserts a value of zero so that the field contains valid data.  Will update
+	this later with a script to fill this field with the data from field 
+	"wind_dir" (wind direction) with the direction as an angle rather than a 
+	compass point. (linked to example 2 in create new field above)
+
+POST weather_index/_update_by_query
+{
+  "script": {
+	"lang": "painless",
+    "source": """
+      if(ctx._source.wind_angle == null) {
+        ctx._source.wind_angle = 0;
+      }
+    """
+  }
+}
+
+-------------------------------------------------------------------------------
+
+INSERTS ALL THE MAPPING FIELDS (same data as .. /weather_index.json) 
+
+PUT weather_index
+{
+  "settings": {
+    "index": {
+      "routing": {
+        "allocation": {
+          "include": {
+            "_tier_preference": "data_content"
+          }
+        }
+      },
+      "number_of_shards": "1",
+      "number_of_replicas": "0"
+    }
+  },
+  "aliases": {},
+  "mappings": {
+    "properties": {
+        "aifstime_utc" : {
+          "type" : "text"
+        },
+        "air_temp" : {
+          "type" : "float"
+        },
+        "apparent_t" : {
+          "type" : "float"
+        },
+        "cloud" : {
+          "type" : "text"
+        },
+        "cloud_base_m" : {
+          "type" : "text"
+        },
+        "cloud_oktas" : {
+          "type" : "integer"
+        },
+        "cloud_type" : {
+          "type" : "text"
+        },
+        "cloud_type_id" : {
+          "type" : "text"
+        },
+        "delta_t" : {
+          "type" : "float"
+        },
+        "dewpt" : {
+          "type" : "float"
+        },
+        "epoch_date" : {
+          "type" : "date",
+          "format" : "epoch_millis"
+        },
+        "gust_kmh" : {
+          "type" : "integer"
+        },
+        "gust_kt" : {
+          "type" : "integer"
+        },
+        "history_product" : {
+          "type" : "text"
+        },
+        "lat" : {
+          "type" : "float"
+        },
+        "local_date_time" : {
+          "type" : "text"
+        },
+        "local_date_time_full" : {
+          "type" : "text"
+        },
+        "local_image_b64" : {
+          "type" : "text"
+        },
+        "lon" : {
+          "type" : "float"
+        },
+        "name" : {
+          "type" : "text"
+        },
+        "press" : {
+          "type" : "float"
+        },
+        "press_msl" : {
+          "type" : "float"
+        },
+        "press_qnh" : {
+          "type" : "float"
+        },
+        "press_tend" : {
+          "type" : "text"
+        },
+        "rain_trace" : {
+          "type" : "float"
+        },
+        "rel_hum" : {
+          "type" : "integer"
+        },
+        "sea_state" : {
+          "type" : "text"
+        },
+        "swell_dir_worded" : {
+          "type" : "text"
+        },
+        "swell_height" : {
+          "type" : "text"
+        },
+        "swell_period" : {
+          "type" : "text"
+        },
+        "vis_km" : {
+          "type" : "text"
+        },
+        "weather" : {
+          "type" : "text"
+        },
+        "wind_angle" : {
+          "type" : "float"
+        },
+        "wind_dir" : {
+          "type" : "keyword"
+        },
+        "wind_spd_kmh" : {
+          "type" : "integer"
+        },
+        "wind_spd_kt" : {
+          "type" : "integer"
+        },
+        "wmo" : {
+          "type" : "integer"
+        }
+    }
+  }
+}
+
+-------------------------------------------------------------------------------
